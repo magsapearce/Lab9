@@ -220,19 +220,30 @@ int AgentRun(char in, char *outBuffer)
             switch (AgentData.AgentGuessData.hit) {
             //TODO HERE: fill in what changes to AgentData.AgentGuessData.hit
             case HIT_MISS:
-                //Note FIELD POS AS MISS
+                FieldSetLocation(FieldData.OppField, AgentData.AgentGuessData.row,
+                        AgentData.AgentGuessData.col, HIT_MISS );
                 break;
             case HIT_HIT:
+                FieldSetLocation(FieldData.OppField, AgentData.AgentGuessData.row,
+                        AgentData.AgentGuessData.col, HIT_MISS );
                 //Note FIELD POS AS HIT
                 break;
             case HIT_SUNK_SMALL_BOAT:
+                FieldSetLocation(FieldData.OppField, AgentData.AgentGuessData.row,
+                        AgentData.AgentGuessData.col, HIT_SUNK_SMALL_BOAT );
                 //Note BOATS...
                 break;
             case HIT_SUNK_MEDIUM_BOAT:
+                FieldSetLocation(FieldData.OppField, AgentData.AgentGuessData.row,
+                        AgentData.AgentGuessData.col, HIT_SUNK_MEDIUM_BOAT);
                 break;
             case HIT_SUNK_LARGE_BOAT:
+                FieldSetLocation(FieldData.OppField, AgentData.AgentGuessData.row,
+                        AgentData.AgentGuessData.col, HIT_SUNK_LARGE_BOAT );
                 break;
             case HIT_SUNK_HUGE_BOAT:
+                FieldSetLocation(FieldData.OppField, AgentData.AgentGuessData.row,
+                        AgentData.AgentGuessData.col, HIT_SUNK_HUGE_BOAT );
                 break;
             }
             if (AgentGetEnemyStatus()) { //If Not Zero
