@@ -173,18 +173,17 @@ int AgentRun(char in, char *outBuffer)
                     FIELD_POSITION_MISS) {
                 AgentData.AgentGuessData.hit = HIT_MISS;
             } else {
-
                 FieldRegisterEnemyAttack(&FieldData.AgentField, &AgentData.AgentGuessData);
                 // Register Hits on yourself
                 if (AgentData.AgentGuessData.hit == HIT_SUNK_SMALL_BOAT) {
                     //If ship was sunk, AgentData.OppGuessData.hit = X sunk. 
-                    AgentData.OppGuessData.hit = HIT_SUNK_SMALL_BOAT;
+                    AgentData.AgentGuessData.hit = HIT_SUNK_SMALL_BOAT;
                 } else if (AgentData.AgentGuessData.hit == HIT_SUNK_MEDIUM_BOAT) {
-                    AgentData.OppGuessData.hit = HIT_SUNK_MEDIUM_BOAT;
+                    AgentData.AgentGuessData.hit = HIT_SUNK_MEDIUM_BOAT;
                 } else if (AgentData.AgentGuessData.hit == HIT_SUNK_LARGE_BOAT) {
-                    AgentData.OppGuessData.hit = HIT_SUNK_LARGE_BOAT;
+                    AgentData.AgentGuessData.hit = HIT_SUNK_LARGE_BOAT;
                 } else if (AgentData.AgentGuessData.hit == HIT_SUNK_HUGE_BOAT) {
-                    AgentData.OppGuessData.hit = HIT_SUNK_HUGE_BOAT;
+                    AgentData.AgentGuessData.hit = HIT_SUNK_HUGE_BOAT;
                 } else {
                     AgentData.AgentGuessData.hit = HIT_HIT;
                 }
@@ -219,6 +218,7 @@ int AgentRun(char in, char *outBuffer)
                 &AgentData.AgentGuessData);
         if (AgentData.ParserStatus == PROTOCOL_PARSED_HIT_MESSAGE) {
             switch (AgentData.AgentGuessData.hit) {
+            //TODO HERE: fill in what changes to AgentData.AgentGuessData.hit
             case HIT_MISS:
                 //Note FIELD POS AS MISS
                 break;
