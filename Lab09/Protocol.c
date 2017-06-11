@@ -78,37 +78,35 @@ ProtocolParserStatus ProtocolDecode(char in, NegotiationData *nData, GuessData *
             if (in == '*') {
                 ProtocolDecodeInfo.DecodeSM = DECODE_FIRST_CHECKSUM_HALF;
                 return PROTOCOL_PARSING_GOOD;
+            } else if (in != NULL) {
+                ProtocolDecodeInfo.Sentence[ProtocolDecodeInfo.sentenceIndex] = in;
+                ProtocolDecodeInfo.sentenceIndex++;
             }
-            ProtocolDecodeInfo.Sentence[ProtocolDecodeInfo.sentenceIndex] = in;
-            ProtocolDecodeInfo.sentenceIndex++;
             return PROTOCOL_PARSING_GOOD;
         case DECODE_FIRST_CHECKSUM_HALF:
-            if (ASCIIConvert(in) >= 0 && ASCIIConvert(in) <= 15) { //ASCII for hex representation
+            if (ASCIIConvert(in) > 0 && ASCIIConvert(in) <= 15) { //ASCII for hex representation
                 ProtocolDecodeInfo.checksum &= 0x00;
                 uint8_t shiftLeft = ASCIIConvert(in) << 4;
                 ProtocolDecodeInfo.checksum |= shiftLeft;
                 ProtocolDecodeInfo.DecodeSM = DECODE_SECOND_CHECKSUM_HALF;
                 return PROTOCOL_PARSING_GOOD;
             }
-            ProtocolDecodeInfo.DecodeSM = DECODE_WAITING;
-            return PROTOCOL_PARSING_FAILURE;
+            return 0;
         case DECODE_SECOND_CHECKSUM_HALF:
-            if (ASCIIConvert(in) >= 0 && ASCIIConvert(in) <= 15) { //ASCII for hex representation
+            if (ASCIIConvert(in) > 0 && ASCIIConvert(in) <= 15) { //ASCII for hex representation
                 ProtocolDecodeInfo.checksum &= 0xF0;
                 ProtocolDecodeInfo.checksum |= ASCIIConvert(in);
+                ProtocolDecodeInfo.Sentence[ProtocolDecodeInfo.sentenceIndex] = '\0';
                 if (ProtocolDecodeInfo.checksum ==
                         CheckSumFunction(ProtocolDecodeInfo.Sentence)) {
-                    ProtocolDecodeInfo.Sentence[ProtocolDecodeInfo.sentenceIndex] = '\0';
                     ProtocolDecodeInfo.DecodeSM = DECODE_NEWLINE;
                     return PROTOCOL_PARSING_GOOD;
                 } else {
                     ProtocolDecodeInfo.DecodeSM = DECODE_WAITING;
                     return PROTOCOL_PARSING_FAILURE;
                 }
-            } else {
-                ProtocolDecodeInfo.DecodeSM = DECODE_WAITING;
-                return PROTOCOL_PARSING_FAILURE;
             }
+            return 0;
         case DECODE_NEWLINE:
             if (in == 0x0A) {
                 if (!strncmp(PAYLOAD_TEMPLATE_CHA, ProtocolDecodeInfo.Sentence, 3)) {
@@ -150,12 +148,8 @@ ProtocolParserStatus ProtocolDecode(char in, NegotiationData *nData, GuessData *
                     return PROTOCOL_PARSING_FAILURE;
                 }
             } else {
-                ProtocolDecodeInfo.DecodeSM = DECODE_WAITING;
-                return PROTOCOL_PARSING_FAILURE;
+                return 0;
             }
-        default:
-            ProtocolDecodeInfo.DecodeSM = DECODE_WAITING;
-            return PROTOCOL_PARSING_FAILURE;
     }
 }
 
@@ -172,12 +166,12 @@ void ProtocolGenerateNegotiationData(NegotiationData * data) {
 }
 
 uint8_t ProtocolValidateNegotiationData(const NegotiationData * data) {
-    NegotiationData tester;
-    tester.hash ^= (data->guess & 0xFF00) >> 8;
-    tester.hash ^= (data->encryptionKey & 0xFF00) >> 8;
-    tester.hash ^= data->guess & 0x00FF;
-    tester.hash ^= data->encryptionKey & 0x00FF;
-    if (tester.hash == data->hash)
+    uint32_t tester = 0;
+    tester ^= (data->guess & 0xFF00) >> 8;
+    tester ^= (data->encryptionKey & 0xFF00) >> 8;
+    tester ^= data->guess & 0x00FF;
+    tester ^= data->encryptionKey & 0x00FF;
+    if (tester == data->hash)
         return TRUE;
     else
         return FALSE;
