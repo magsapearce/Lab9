@@ -13,6 +13,8 @@ struct AgentData {
     AgentState CurrAgentState; //Agent Run States
     ProtocolParserStatus ParserStatus; //Current Parser State Machine States
     FieldOledTurn GameTurn; //CurrentTurn
+    uint8_t Heuristics; //Flag for hit
+    GuessData LastGuess; //Last Guess for heuristics 
 };
 
 struct FieldData {
@@ -135,12 +137,36 @@ int AgentRun(char in, char *outBuffer) {
             } else
                 return 0;
         case AGENT_STATE_SEND_GUESS:
-            while (1) {
-                AgentData.AgentGuessData.row = rand() % FIELD_ROWS;
-                AgentData.AgentGuessData.col = rand() % FIELD_COLS;
-                if (FieldAt(&FieldData.OppField, AgentData.AgentGuessData.row,
-                        AgentData.AgentGuessData.col) == FIELD_POSITION_UNKNOWN)
-                    break; //Break if random guess hasn't been chosen before
+            if (AgentData.Heuristics) {
+                uint16_t forVar;
+                for (forVar = 1; FieldAt(&FieldData.OppField, AgentData.AgentGuessData.row,
+                            AgentData.AgentGuessData.col) != FIELD_POSITION_UNKNOWN && 
+                        AgentData.AgentGuessData.row <= FIELD_ROWS &&
+                        AgentData.AgentGuessData.col <= FIELD_COLS; forVar++) {
+                    BoatDirection randDirection = rand() % 4;
+                    switch (randDirection) {
+                        case FIELD_BOAT_DIRECTION_NORTH:
+                            AgentData.AgentGuessData.row = 
+                                    AgentData.LastGuess.row + forVar;
+                        case FIELD_BOAT_DIRECTION_EAST:
+                            AgentData.AgentGuessData.col = 
+                                    AgentData.LastGuess.col + forVar;
+                        case FIELD_BOAT_DIRECTION_SOUTH:
+                            AgentData.AgentGuessData.row =
+                                    AgentData.LastGuess.row - forVar;
+                        case FIELD_BOAT_DIRECTION_WEST:
+                            AgentData.AgentGuessData.col = 
+                                    AgentData.LastGuess.col - forVar;
+                    }
+                }
+            } else {
+                while (1) {
+                    AgentData.AgentGuessData.row = rand() % FIELD_ROWS;
+                    AgentData.AgentGuessData.col = rand() % FIELD_COLS;
+                    if (FieldAt(&FieldData.OppField, AgentData.AgentGuessData.row,
+                            AgentData.AgentGuessData.col) == FIELD_POSITION_UNKNOWN)
+                        break; //Break if random guess hasn't been chosen before
+                }
             }
             AgentData.CurrAgentState = AGENT_STATE_WAIT_FOR_HIT;
             return ProtocolEncodeCooMessage(outBuffer, &AgentData.AgentGuessData);
@@ -148,26 +174,10 @@ int AgentRun(char in, char *outBuffer) {
             AgentData.ParserStatus = ProtocolDecode(in, &AgentData.OppNegData,
                     &AgentData.AgentGuessData);
             if (AgentData.ParserStatus == PROTOCOL_PARSED_COO_MESSAGE) {
-                if (FieldAt(&FieldData.AgentField, AgentData.AgentGuessData.row,
-                        AgentData.AgentGuessData.col) == FIELD_POSITION_EMPTY ||
-                        FIELD_POSITION_MISS) {
-                    AgentData.AgentGuessData.hit = HIT_MISS;
-                } else {
-                    FieldRegisterEnemyAttack(&FieldData.AgentField, &AgentData.AgentGuessData);
-                    // Register Hits on yourself
-                    if (AgentData.AgentGuessData.hit == HIT_SUNK_SMALL_BOAT) {
-                        //If ship was sunk, AgentData.OppGuessData.hit = X sunk. 
-                        AgentData.AgentGuessData.hit = HIT_SUNK_SMALL_BOAT;
-                    } else if (AgentData.AgentGuessData.hit == HIT_SUNK_MEDIUM_BOAT) {
-                        AgentData.AgentGuessData.hit = HIT_SUNK_MEDIUM_BOAT;
-                    } else if (AgentData.AgentGuessData.hit == HIT_SUNK_LARGE_BOAT) {
-                        AgentData.AgentGuessData.hit = HIT_SUNK_LARGE_BOAT;
-                    } else if (AgentData.AgentGuessData.hit == HIT_SUNK_HUGE_BOAT) {
-                        AgentData.AgentGuessData.hit = HIT_SUNK_HUGE_BOAT;
-                    } else {
-                        AgentData.AgentGuessData.hit = HIT_HIT;
-                    }
-                }
+                AgentData.AgentGuessData.hit = FieldRegisterEnemyAttack(
+                        &FieldData.AgentField, &AgentData.AgentGuessData);
+                // Register Hits on yourself
+                FieldUpdateKnowledge(&FieldData.AgentField, &AgentData.AgentGuessData);
                 if (AgentGetStatus()) { //If Not Zero
                     AgentData.GameTurn = FIELD_OLED_TURN_MINE;
                     FieldOledDrawScreen(&FieldData.AgentField, &FieldData.OppField,
@@ -197,31 +207,33 @@ int AgentRun(char in, char *outBuffer) {
                         //TODO HERE: fill in what changes to AgentData.AgentGuessData.hit
                     case HIT_MISS:
                         FieldSetLocation(&FieldData.OppField, AgentData.AgentGuessData.row,
-                                AgentData.AgentGuessData.col, HIT_MISS);
+                                AgentData.AgentGuessData.col, FIELD_POSITION_EMPTY);
                         break;
                     case HIT_HIT:
                         FieldSetLocation(&FieldData.OppField, AgentData.AgentGuessData.row,
                                 AgentData.AgentGuessData.col, FIELD_POSITION_HIT);
+                        AgentData.LastGuess = AgentData.AgentGuessData;
+                        AgentData.Heuristics = TRUE;
                         break;
                     case HIT_SUNK_SMALL_BOAT:
                         FieldSetLocation(&FieldData.OppField, AgentData.AgentGuessData.row,
                                 AgentData.AgentGuessData.col, FIELD_POSITION_SMALL_BOAT);
-                        FieldData.AgentField.smallBoatLives = 0;
+                        FieldData.OppField.smallBoatLives = 0;
                         break;
                     case HIT_SUNK_MEDIUM_BOAT:
                         FieldSetLocation(&FieldData.OppField, AgentData.AgentGuessData.row,
                                 AgentData.AgentGuessData.col, FIELD_POSITION_MEDIUM_BOAT);
-                        FieldData.AgentField.mediumBoatLives = 0;
+                        FieldData.OppField.mediumBoatLives = 0;
                         break;
                     case HIT_SUNK_LARGE_BOAT:
                         FieldSetLocation(&FieldData.OppField, AgentData.AgentGuessData.row,
                                 AgentData.AgentGuessData.col, FIELD_POSITION_LARGE_BOAT);
-                        FieldData.AgentField.largeBoatLives = 0;
+                        FieldData.OppField.largeBoatLives = 0;
                         break;
                     case HIT_SUNK_HUGE_BOAT:
                         FieldSetLocation(&FieldData.OppField, AgentData.AgentGuessData.row,
                                 AgentData.AgentGuessData.col, FIELD_POSITION_HUGE_BOAT);
-                        FieldData.AgentField.hugeBoatLives = 0;
+                        FieldData.OppField.hugeBoatLives = 0;
                         break;
                 }
                 if (AgentGetEnemyStatus()) { //If Not Zero
